@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"faceit_stats_wrapper/internal/repository"
+	"faceit_stats_wrapper/internal/repository/postgres"
 	"faceit_stats_wrapper/internal/service"
 	apphttp "faceit_stats_wrapper/internal/transport/http"
 	"fmt"
@@ -27,6 +29,25 @@ func main() {
 		log.Fatal("FACEIT_API_KEY environment variable is not set")
 	}
 
+	port := os.Getenv("PORT")
+	if port == "" {
+		log.Fatal("PORT environment variable is not set")
+	}
+
+	pgURL := os.Getenv("PG_URL")
+	if pgURL == "" {
+		log.Fatal("PG_URL environment variable is not set")
+	}
+
+	ctx := context.Background()
+	pool, err := postgres.NewPool(ctx, pgURL)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer pool.Close()
+
+	log.Println("Successfully connected to database")
+
 	httpClient := &http.Client{
 		Timeout: 10 * time.Second,
 	}
@@ -39,7 +60,7 @@ func main() {
 	handler.InitRoutes(mux)
 
 	srv := &http.Server{
-		Addr:         ":8080",
+		Addr:         ":" + port,
 		Handler:      mux,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
