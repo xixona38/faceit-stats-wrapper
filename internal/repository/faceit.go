@@ -7,6 +7,7 @@ import (
 	"faceit_stats_wrapper/internal/service"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 )
 
@@ -64,7 +65,12 @@ type MatchStatsDTO struct {
 }
 
 func (api *faceitAPI) GetPlayerByNickname(ctx context.Context, nickname string) (*entity.Player, error) {
-	url := fmt.Sprintf("%s/players?nickname=%s", api.baseURL, nickname)
+	params := url.Values{}
+	params.Set("nickname", nickname)
+
+	url := api.baseURL + "/players?" + params.Encode()
+
+	// url := fmt.Sprintf("%s/players?nickname=%s", api.baseURL, nickname)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -157,7 +163,6 @@ func (api *faceitAPI) GetPlayerLastMatch(ctx context.Context, playerID string) (
 			if player.PlayerID == playerID {
 				kills, _ := strconv.Atoi(player.PlayerStats.Kills)
 				deaths, _ := strconv.Atoi(player.PlayerStats.Deaths)
-				assists, _ := strconv.Atoi(player.PlayerStats.Assists)
 				kd, _ := strconv.ParseFloat(player.PlayerStats.KDRatio, 64)
 
 				resultTxt := "Loss"
@@ -172,7 +177,6 @@ func (api *faceitAPI) GetPlayerLastMatch(ctx context.Context, playerID string) (
 					Score:   round.RoundStats.Score,
 					Kills:   kills,
 					Deaths:  deaths,
-					Assists: assists,
 					KDRatio: kd,
 				}, nil
 			}
