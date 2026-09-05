@@ -52,8 +52,10 @@ func main() {
 		Timeout: 10 * time.Second,
 	}
 
-	repo := repository.NewFaceitAPI(httpClient, apiKey)
-	svc := service.NewStatsService(repo)
+	faceitRepo := repository.NewFaceitAPI(httpClient, apiKey)
+	dbRepoSet := postgres.NewPostgresRepoSet(pool)
+	dbRepoGet := postgres.NewPostgresRepoGet(pool)
+	svc := service.NewStatsService(faceitRepo, dbRepoSet, dbRepoGet)
 	handler := apphttp.NewHandler(svc)
 
 	mux := http.NewServeMux()
