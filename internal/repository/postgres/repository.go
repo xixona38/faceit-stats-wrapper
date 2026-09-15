@@ -73,12 +73,12 @@ func (r *PostgresRepoSet) SaveMatch(ctx context.Context, match *entity.Match, pl
 
 func (r *PostgresRepoGet) GetPlayerByNickname(ctx context.Context, nickname string) (*entity.Player, error) {
 	query := `
-		SELECT player_id, nickname 
+		SELECT player_id, nickname, matches_synced_at 
 		FROM players 
 		WHERE nickname = $1
 	`
 	var player entity.Player
-	err := r.pool.QueryRow(ctx, query, nickname).Scan(&player.ID, &player.Nickname)
+	err := r.pool.QueryRow(ctx, query, nickname).Scan(&player.ID, &player.Nickname, &player.MatchesSyncedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil

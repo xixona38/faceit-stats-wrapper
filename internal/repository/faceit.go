@@ -105,33 +105,21 @@ func (api *faceitAPI) GetPlayerByNickname(ctx context.Context, nickname string) 
 }
 
 func (api *faceitAPI) GetPlayerLastMatch(ctx context.Context, playerID string) (*entity.Match, error) {
-	historyURL := fmt.Sprintf("%s/players/%s/history?game=cs2&offset=0&limit=1", api.baseURL, playerID)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, historyURL, nil)
+	matchIDs, err := api.getPlayerMatchIDs(ctx, playerID, 1)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create history request: %w", err)
+		return nil, fmt.Errorf("failed to get match ID: %w", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+api.apiKey)
-
-	resp, err := api.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("history http request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	var history historyDTO
-
-	if err := json.NewDecoder(resp.Body).Decode(&history); err != nil {
-		return nil, fmt.Errorf("failed to decode history: %w", err)
+	if len(matchIDs) == 0 {
+		return nil, fmt.Errorf("no matches found for player %s", playerID)
 	}
 
-	if len(history.Items) == 0 {
-		return nil, fmt.Errorf("no matches found for player.")
-	}
+	matchID := matchIDs[0]
 
-	matchID := history.Items[0].MatchID
+	return api.getMatchStats(ctx, matchID, playerID)
+}
 
+func (api *faceitAPI) getMatchStats(ctx context.Context, matchID string, playerID string) (*entity.Match, error) {
 	matchURL := fmt.Sprintf("%s/matches/%s/stats", api.baseURL, matchID)
 
 	matchReq, err := http.NewRequestWithContext(ctx, http.MethodGet, matchURL, nil)
@@ -146,6 +134,10 @@ func (api *faceitAPI) GetPlayerLastMatch(ctx context.Context, playerID string) (
 		return nil, fmt.Errorf("match stats http request failed: %w", err)
 	}
 	defer matchResp.Body.Close()
+
+	if matchResp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("faceit match stats: unexpected status code: %d", matchResp.StatusCode)
+	}
 
 	var statsDTO MatchStatsDTO
 	if err := json.NewDecoder(matchResp.Body).Decode(&statsDTO); err != nil {
@@ -183,5 +175,63 @@ func (api *faceitAPI) GetPlayerLastMatch(ctx context.Context, playerID string) (
 		}
 	}
 
-	return nil, fmt.Errorf("player %s now found in match %s", playerID, matchID)
+	return nil, fmt.Errorf("player %s not found in match %s", playerID, matchID)
+}
+
+func (api *faceitAPI) getPlayerMatchIDs(ctx context.Context, playerID string, limit int) ([]string, error) {
+	historyURL := fmt.Sprintf("%s/players/%s/history?game=cs2&offset=0&limit=%d", api.baseURL, playerID, limit)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, historyURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create history request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+api.apiKey)
+
+	resp, err := api.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("history http request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("faceit history: unexpected status code: %d", resp.StatusCode)
+	}
+	var history historyDTO
+
+	if err := json.NewDecoder(resp.Body).Decode(&history); err != nil {
+		return nil, fmt.Errorf("failed to decode history: %w", err)
+	}
+
+	matchIDs := make([]string, 0, 20)
+
+	if len(history.Items) == 0 {
+		return matchIDs, nil
+	}
+
+	for _, v := range history.Items {
+		matchIDs = append(matchIDs, v.MatchID)
+	}
+
+	return matchIDs, nil
+
+}
+
+func (api *faceitAPI) GetPlayerMatches(ctx context.Context, playerID string, limit int) ([]entity.Match, error) {
+	matchIDs, err := api.getPlayerMatchIDs(ctx, playerID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get match IDs for player %s: %w", playerID, err)
+	}
+
+	matchStats := make([]entity.Match, 0, len(matchIDs))
+
+	for _, v := range matchIDs {
+		match, err := api.getMatchStats(ctx, v, playerID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get match stats: %w", err)
+		}
+		matchStats = append(matchStats, *match)
+	}
+
+	return matchStats, nil
 }
