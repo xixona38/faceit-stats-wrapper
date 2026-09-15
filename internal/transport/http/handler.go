@@ -20,6 +20,7 @@ func (h *Handler) InitRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /player/{nickname}", h.GetPlayer)
 	mux.HandleFunc("GET /player/{nickname}/match", h.GetLastMatch)
 	mux.HandleFunc("GET /player/{nickname}/matches", h.GetPlayerMatches)
+	mux.HandleFunc("POST /player/{nickname}/matches/sync", h.PostPlayerMatches)
 }
 
 func (h *Handler) GetPlayer(w http.ResponseWriter, r *http.Request) {
@@ -73,4 +74,20 @@ func (h *Handler) GetPlayerMatches(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, matches)
+}
+
+func (h *Handler) PostPlayerMatches(w http.ResponseWriter, r *http.Request) {
+	nickname := r.PathValue("nickname")
+	if nickname == "" {
+		writeError(w, http.StatusBadRequest, "nickname is required!")
+		return
+	}
+
+	err := h.svc.SyncPlayerMatches(r.Context(), nickname)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to sync player matches")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, "matches were added to the database")
 }

@@ -8,12 +8,14 @@ import (
 type FaceitRepository interface {
 	GetPlayerByNickname(ctx context.Context, nickname string) (*entity.Player, error)
 	GetPlayerLastMatch(ctx context.Context, playerID string) (*entity.Match, error)
+	GetPlayerMatches(ctx context.Context, playerID string, limit int) ([]entity.Match, error)
 }
 
 type StatsService interface {
 	GetPlayer(ctx context.Context, nickname string) (*entity.Player, error)
 	GetLastMatch(ctx context.Context, nickname string) (*entity.Match, error)
 	GetPlayerMatches(ctx context.Context, nickname string) ([]entity.Match, error)
+	SyncPlayerMatches(ctx context.Context, nickname string) error
 }
 
 type DBRepositorySetter interface {

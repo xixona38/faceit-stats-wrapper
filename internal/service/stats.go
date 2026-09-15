@@ -79,3 +79,24 @@ func (s *statsService) GetPlayerMatches(ctx context.Context, nickname string) ([
 
 	return matches, nil
 }
+
+func (s *statsService) SyncPlayerMatches(ctx context.Context, nickname string) error {
+	player, err := s.GetPlayer(ctx, nickname)
+	if err != nil {
+		return fmt.Errorf("failed to get player by nickname: %w", err)
+	}
+
+	matches, err := s.faceitRepo.GetPlayerMatches(ctx, player.ID, 20)
+	if err != nil {
+		return fmt.Errorf("failed to get player matches: %w", err)
+	}
+
+	for _, v := range matches {
+		err = s.dbRepoSet.SaveMatch(ctx, &v, player.ID)
+		if err != nil {
+			return fmt.Errorf("failed to save match %s: %w", v.MatchID, err)
+		}
+	}
+
+	return nil
+}
