@@ -15,12 +15,13 @@ type StatsService interface {
 	GetPlayer(ctx context.Context, nickname string) (*entity.Player, error)
 	GetLastMatch(ctx context.Context, nickname string) (*entity.Match, error)
 	GetPlayerMatches(ctx context.Context, nickname string) ([]entity.Match, error)
-	SyncPlayerMatches(ctx context.Context, nickname string) error
+	// SyncPlayerMatches(ctx context.Context, nickname string) error
 }
 
 type DBRepositorySetter interface {
 	SavePlayer(ctx context.Context, player *entity.Player) error
 	SaveMatch(ctx context.Context, match *entity.Match, playerID string) error
+	MarkPlayerMatchesSynced(ctx context.Context, playerID string) error
 }
 
 type DBRepositoryGetter interface {

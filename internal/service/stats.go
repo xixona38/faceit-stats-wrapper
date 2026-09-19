@@ -5,6 +5,7 @@ import (
 	"errors"
 	"faceit_stats_wrapper/internal/entity"
 	"fmt"
+	"time"
 )
 
 type statsService struct {
@@ -68,8 +69,25 @@ func (s *statsService) GetPlayerMatches(ctx context.Context, nickname string) ([
 		return nil, fmt.Errorf("failed to get player: %w", err)
 	}
 
-	if player == nil {
-		return nil, ErrPlayerNotFound
+	const historyTTL = 5 * time.Minute
+
+	needSync := player == nil ||
+		player.MatchesSyncedAt == nil ||
+		time.Since(*player.MatchesSyncedAt) >= historyTTL
+
+	if needSync {
+		if err := s.syncPlayerMatches(ctx, nickname); err != nil {
+			return nil, fmt.Errorf("failed to sync player matches: %w", err)
+		}
+
+		player, err = s.dbRepoGet.GetPlayerByNickname(ctx, nickname)
+		if err != nil {
+			return nil, fmt.Errorf("failed to sync player: %w", err)
+		}
+
+		if player == nil {
+			return nil, fmt.Errorf("player missing after successful sync")
+		}
 	}
 
 	matches, err := s.dbRepoGet.GetPlayerMatches(ctx, player.ID)
@@ -80,7 +98,7 @@ func (s *statsService) GetPlayerMatches(ctx context.Context, nickname string) ([
 	return matches, nil
 }
 
-func (s *statsService) SyncPlayerMatches(ctx context.Context, nickname string) error {
+func (s *statsService) syncPlayerMatches(ctx context.Context, nickname string) error {
 	player, err := s.GetPlayer(ctx, nickname)
 	if err != nil {
 		return fmt.Errorf("failed to get player by nickname: %w", err)
@@ -96,6 +114,10 @@ func (s *statsService) SyncPlayerMatches(ctx context.Context, nickname string) e
 		if err != nil {
 			return fmt.Errorf("failed to save match %s: %w", v.MatchID, err)
 		}
+	}
+
+	if err := s.dbRepoSet.MarkPlayerMatchesSynced(ctx, player.ID); err != nil {
+		return fmt.Errorf("failed to update matches sync time: %w", err)
 	}
 
 	return nil

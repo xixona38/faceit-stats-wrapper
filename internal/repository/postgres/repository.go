@@ -132,3 +132,18 @@ func (r *PostgresRepoGet) GetPlayerMatches(ctx context.Context, playerID string)
 
 	return matches, nil
 }
+
+func (r *PostgresRepoSet) MarkPlayerMatchesSynced(ctx context.Context, playerID string) error {
+	query := `
+		UPDATE players
+		SET matches_synced_at = CURRENT_TIMESTAMP
+		WHERE player_id = $1
+	`
+
+	_, err := r.pool.Exec(ctx, query, playerID)
+	if err != nil {
+		return fmt.Errorf("failed to mark player matches as synced: %w", err)
+	}
+
+	return nil
+}
